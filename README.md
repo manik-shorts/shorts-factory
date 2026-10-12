@@ -268,6 +268,36 @@ pipeline/render.py      – ffmpeg: center-crop 9:16 (slight upward bias),
 
 ---
 
+## 📝 Transcript viewer (`/transcript`, login required)
+
+Paste a YouTube URL → get the video's full transcript as clean,
+timestamped lines.
+
+- **Fast path first:** grabs YouTube's own captions (manual or
+  auto-generated) via yt-dlp as VTT — no video download, takes seconds.
+- **Fallback:** if the video has no captions, downloads audio-only and
+  transcribes with faster-whisper (respects the `WHISPER_MODEL` env var).
+- The result page shows which source was used ("YouTube captions" vs
+  "AI transcribed"), has clickable timestamps (click copies `MM:SS`),
+  a **Copy** button, and **.txt / .srt downloads**.
+
+## 🔍 Video inspector (`/inspect`, login required)
+
+Paste a YouTube URL → competitor-research metadata, no download:
+
+- Title, channel, duration, view count, like count, upload date
+- **Tags** — the real YouTube metadata tags (`yt-dlp --dump-json`)
+- **Hashtags** — `#[A-Za-z0-9_]+` extracted from title + description
+- Full description (collapsible)
+- Tags and hashtags render as clickable **copy chips** with a "copy all"
+  button each.
+
+Both pages live in the top nav (🎬 Shorts · 📝 Transcript · 🔍 Inspect),
+share the same login gate (`user_can_generate`), and are 100% free —
+no API keys.
+
+---
+
 ## Accounts & access control
 
 - **Signup:** name, email, password. Passwords are hashed with
@@ -304,7 +334,8 @@ shorts_factory/
     ├── transcribe.py    – faster-whisper, word timestamps, JSON cache
     ├── highlights.py    – heuristic highlight scoring
     ├── subtitles.py     – styled .ass generation (karaoke/clean/pop/minimal, 1080×1920)
-    └── render.py        – ffmpeg 9:16 crop + subtitle burn-in
+    ├── render.py        – ffmpeg 9:16 crop + subtitle burn-in
+    └── inspect.py       – video metadata/tags/hashtags + YouTube caption fetching
 ```
 
 Runtime files (created automatically, not in git): `shorts_factory.db`,

@@ -14,6 +14,7 @@ feature requires login. Access is controlled by ONE gating function,
 ``user_can_generate()`` — see below.
 """
 import json
+import glob
 import os
 import secrets
 import sqlite3
@@ -21,7 +22,7 @@ import threading
 import time
 import uuid
 
-from flask import (Flask, jsonify, redirect, render_template_string,
+from flask import (Flask, Response, jsonify, redirect, render_template_string,
                    request, send_file, url_for)
 from flask_login import (LoginManager, UserMixin, current_user, login_required,
                          login_user, logout_user)
@@ -29,6 +30,11 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from pipeline.runner import run_pipeline
 from pipeline.subtitles import STYLES, DEFAULT_STYLE
+from pipeline.inspect import (fetch_metadata, extract_hashtags,
+                              fetch_captions, segments_to_txt,
+                              segments_to_srt, coalesce, fmt_clock)
+from pipeline.transcribe import transcribe
+import pipeline.download as _dl  # for YTDLP/_run in the audio fallback
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "shorts_factory.db")
@@ -168,10 +174,21 @@ video{width:100%;max-height:60vh;border-radius:12px;background:#000}
 </style>
 """
 
+NAV = """
+<div class="top"><h1>🎬 Shorts Factory</h1>
+  <span class="u">{{user}} · <a href="/logout">logout</a></span></div>
+<nav style="display:flex;gap:8px;margin:10px 0 4px">
+  <a class="btn" style="padding:10px;font-size:15px;margin:0" href="/">🎬 Shorts</a>
+  <a class="btn" style="padding:10px;font-size:15px;margin:0;background:#33333f"
+     href="/transcript">📝 Transcript</a>
+  <a class="btn" style="padding:10px;font-size:15px;margin:0;background:#33333f"
+     href="/inspect">🔍 Inspect</a>
+</nav>
+"""
+
 HOME = CSS + """
 <div class="wrap">
-  <div class="top"><h1>🎬 Shorts Factory</h1>
-    <span class="u">{{user}} · <a href="/logout">logout</a></span></div>
+""" + NAV + """
   <p class="sub">Paste a YouTube link → get 10 vertical Shorts with subtitles.</p>
   <div class="card">
     <form action="/generate" method="post">
@@ -267,6 +284,329 @@ GATE_DENIED = CSS + """
 unlock another 24 hours — coming soon.</p>
 <div class="card"><a class="btn" href="/">Back home</a></div></div>
 """
+
+TRANSCRIPT_FORM = CSS + """
+<div class="wrap">
+""" + NAV + """
+  <p class="sub">Paste a YouTube link → get its full transcript.</p>
+  {% if err %}<div class="err">{{err}}</div>{% endif %}
+  <div class="card">
+    <form action="/transcript" method="post">
+      <input type="url" name="url" required
+             placeholder="https://www.youtube.com/watch?v=...">
+      <button type="submit">📝 Get transcript</button>
+    </form>
+    <p class="note">Tries YouTube's own captions first (fast, no download).
+    Falls back to AI transcription when a video has no captions.</p>
+  </div>
+</div>
+"""
+
+TRANSCRIPT_RESULT = CSS + """
+<div class="wrap">
+""" + NAV + """
+  <p class="sub">{{title}}<br>
+  <span class="note">Source: <b>{{src}}</b> · {{n}} lines</span></p>
+  <div class="card" style="display:flex;gap:8px">
+    <button id="copybtn" style="margin:0">📋 Copy</button>
+    <a class="btn" style="margin:0" href="/transcript/file/{{token}}.txt" download>⬇ .txt</a>
+    <a class="btn" style="margin:0;background:#33333f"
+       href="/transcript/file/{{token}}.srt" download>⬇ .srt</a>
+  </div>
+  <div class="card" id="tbox">
+  {% for s in lines %}
+    <p style="margin:8px 0;line-height:1.5">
+      <a href="#" class="ts" data-t="{{s.t}}"
+         style="color:#7ab8ff;text-decoration:none;font-size:13px">{{s.clock}}</a>
+      &nbsp;{{s.text}}</p>
+  {% endfor %}
+  </div>
+</div>
+<script>
+document.getElementById("copybtn").onclick=async()=>{
+  const t=[...document.querySelectorAll("#tbox p")]
+    .map(p=>p.innerText).join("\\n");
+  await navigator.clipboard.writeText(t);
+  document.getElementById("copybtn").textContent="✅ Copied!";
+};
+document.querySelectorAll(".ts").forEach(a=>{a.onclick=e=>{
+  e.preventDefault();
+  navigator.clipboard.writeText(a.dataset.t);
+  a.textContent="✓";
+};});
+</script>
+"""
+
+TPROGRESS = CSS + """
+<div class="wrap"><h1>Transcribing… ⏳</h1>
+<p class="sub" id="msg">This video has no YouTube captions — running AI
+transcription (a few minutes). Keep this page open.</p>
+<div class="bar"><div id="fill" style="width:30%"></div></div></div>
+<script>
+const jid="{{jid}}";
+async function tick(){
+  const r=await fetch("/tstatus/"+jid); const s=await r.json();
+  document.getElementById("msg").textContent=
+    s.stage==="error" ? "Error: "+s.error : s.msg;
+  if(s.stage==="done") location.href="/transcript/view/"+s.token;
+  else if(s.stage!=="error") setTimeout(tick,3000);
+}
+tick();
+</script>
+"""
+
+INSPECT_FORM = CSS + """
+<div class="wrap">
+""" + NAV + """
+  <p class="sub">Paste a YouTube link → see its title, tags, hashtags and
+  description. Handy for competitor research.</p>
+  {% if err %}<div class="err">{{err}}</div>{% endif %}
+  <div class="card">
+    <form action="/inspect" method="post">
+      <input type="url" name="url" required
+             placeholder="https://www.youtube.com/watch?v=...">
+      <button type="submit">🔍 Inspect video</button>
+    </form>
+    <p class="note">Reads public metadata only — nothing is downloaded.</p>
+  </div>
+</div>
+"""
+
+INSPECT_RESULT = CSS + """
+<div class="wrap">
+""" + NAV + """
+  <div class="card">
+    <h1 style="font-size:20px">{{meta.title}}</h1>
+    <p class="sub">{{meta.channel}} · {{meta.duration_str}} ·
+       👁 {{meta.view_count}} · 👍 {{meta.like_count}} ·
+       📅 {{meta.upload_date}}</p>
+    <details><summary style="cursor:pointer;color:#7ab8ff">Full description
+      ({{meta.description|length}} chars)</summary>
+      <p class="note" style="white-space:pre-wrap">{{meta.description}}</p>
+    </details>
+  </div>
+  <div class="card">
+    <div class="top"><h1 style="font-size:18px">🏷 Tags ({{meta.tags|length}})</h1>
+      <button id="ctags" style="width:auto;padding:8px 14px;margin:0;font-size:14px">Copy all</button></div>
+    <p id="tagbox" style="line-height:2.1">
+    {% for t in meta.tags %}<span class="chip">{{t}}</span> {% else %}
+      <span class="note">No tags on this video.</span>{% endfor %}</p>
+  </div>
+  <div class="card">
+    <div class="top"><h1 style="font-size:18px"># Hashtags ({{hashtags|length}})</h1>
+      <button id="chash" style="width:auto;padding:8px 14px;margin:0;font-size:14px">Copy all</button></div>
+    <p id="hashbox" style="line-height:2.1">
+    {% for h in hashtags %}<span class="chip">{{h}}</span> {% else %}
+      <span class="note">No hashtags found.</span>{% endfor %}</p>
+  </div>
+  <p class="note"><a href="{{meta.webpage_url}}">Open on YouTube ↗</a></p>
+</div>
+<style>.chip{display:inline-block;background:#2a2a35;border:1px solid #3a3a48;
+  border-radius:20px;padding:4px 12px;font-size:14px;margin:2px;cursor:pointer}
+  .chip:active{background:#3a3a48}</style>
+<script>
+function chips(id){return [...document.querySelectorAll("#"+id+" .chip")]
+  .map(c=>c.textContent);}
+document.getElementById("ctags").onclick=async e=>{
+  await navigator.clipboard.writeText(chips("tagbox").join(", "));
+  e.target.textContent="✅ Copied!";};
+document.getElementById("chash").onclick=async e=>{
+  await navigator.clipboard.writeText(chips("hashbox").join(" "));
+  e.target.textContent="✅ Copied!";};
+document.querySelectorAll(".chip").forEach(c=>{c.onclick=async()=>{
+  await navigator.clipboard.writeText(c.textContent);};});
+</script>
+"""
+
+
+# --- transcript + inspect -----------------------------------------------------
+# transcript results: token -> {user_id, title, lines, source, url}
+transcripts = {}
+# transcript AI-fallback jobs: job_id -> {user_id, stage, msg, error, token}
+tjobs = {}
+
+
+def _store_transcript(user_id, title, lines, source, url):
+    token = uuid.uuid4().hex[:12]
+    transcripts[token] = {"user_id": user_id, "title": title,
+                          "lines": lines, "source": source, "url": url}
+    return token
+
+
+def _transcript_view_lines(lines):
+    return [{"t": fmt_clock(s["start"]), "clock": fmt_clock(s["start"]),
+             "text": s["text"]} for s in lines]
+
+
+def _download_audio_only(url, work_dir):
+    """Download best audio only (for the AI transcript fallback)."""
+    os.makedirs(work_dir, exist_ok=True)
+    out_tpl = os.path.join(work_dir, "audio.%(ext)s")
+    last_err = ""
+    for extra in ((), ("--extractor-args", "youtube:player_client=android")):
+        rc, _, err = _dl._run(_dl.YTDLP + [
+            "--no-playlist", "-f", "bestaudio/best",
+            "--retries", "10", "--socket-timeout", "30",
+            "-o", out_tpl, *extra, url,
+        ])
+        if rc == 0:
+            break
+        last_err = err
+    else:
+        tail = "\n".join(last_err.splitlines()[-4:])
+        raise RuntimeError(f"Audio download failed\n{tail}")
+    cands = [p for p in glob.glob(os.path.join(work_dir, "audio.*"))
+             if not p.endswith(".part")]
+    if not cands:
+        raise RuntimeError("Audio download produced no file")
+    return sorted(cands)[0]
+
+
+def _tjob_worker(job_id, url):
+    job = tjobs[job_id]
+    work_dir = os.path.join(BASE_DIR, "transcript_jobs", job_id)
+    try:
+        job["msg"] = "Downloading audio…"
+        audio = _download_audio_only(url, work_dir)
+        job["msg"] = "AI transcribing (this takes a few minutes)…"
+        model_name = os.environ.get("WHISPER_MODEL", "base")
+        segs = transcribe(audio, work_dir, model_name=model_name)
+        lines = coalesce(
+            [{"start": s["start"], "end": s["end"], "text": s["text"]}
+             for s in segs if s["text"].strip()])
+        try:
+            meta = fetch_metadata(url)
+            title = meta["title"]
+        except Exception:
+            title = url
+        token = _store_transcript(job["user_id"], title, lines,
+                                  "AI transcribed", url)
+        job["token"] = token
+        job["stage"] = "done"
+        job["msg"] = "Done!"
+    except RuntimeError as exc:
+        job["error"] = str(exc)
+        job["stage"] = "error"
+    except Exception as exc:
+        job["error"] = f"Unexpected error: {exc}"
+        job["stage"] = "error"
+
+
+@app.route("/transcript", methods=["GET", "POST"])
+@login_required
+def transcript():
+    if not user_can_generate(current_user):
+        return render_template_string(GATE_DENIED), 403
+    if request.method == "GET":
+        return render_template_string(TRANSCRIPT_FORM, user=current_user.name)
+    url = request.form.get("url", "").strip()
+    if not url or "http" not in url:
+        return render_template_string(TRANSCRIPT_FORM, user=current_user.name,
+                                      err="Please paste a valid YouTube URL.")
+    work_dir = os.path.join(BASE_DIR, "transcript_jobs",
+                            "fast_" + uuid.uuid4().hex[:8])
+    try:
+        lines, source = fetch_captions(url, work_dir)
+    except RuntimeError as exc:
+        return render_template_string(TRANSCRIPT_FORM, user=current_user.name,
+                                      err=str(exc))
+    if lines:
+        try:
+            meta = fetch_metadata(url)
+            title = meta["title"]
+        except Exception:
+            title = url
+        token = _store_transcript(current_user.id, title, lines, source, url)
+        return redirect(url_for("transcript_view", token=token))
+    # No captions — fall back to AI transcription in the background.
+    job_id = uuid.uuid4().hex[:12]
+    tjobs[job_id] = {"user_id": current_user.id, "stage": "working",
+                     "msg": "Starting…", "error": None, "token": None}
+    t = threading.Thread(target=_tjob_worker, args=(job_id, url), daemon=True)
+    t.start()
+    return redirect(url_for("tprogress", job_id=job_id))
+
+
+def _tjob_or_404(job_id):
+    job = tjobs.get(job_id)
+    if not job or job["user_id"] != current_user.id:
+        return None
+    return job
+
+
+@app.route("/tprogress/<job_id>")
+@login_required
+def tprogress(job_id):
+    if not _tjob_or_404(job_id):
+        return redirect(url_for("transcript"))
+    return render_template_string(TPROGRESS, jid=job_id)
+
+
+@app.route("/tstatus/<job_id>")
+@login_required
+def tstatus(job_id):
+    job = _tjob_or_404(job_id)
+    if not job:
+        return jsonify({"stage": "error", "error": "not found"}), 404
+    return jsonify({"stage": job["stage"], "msg": job["msg"],
+                    "error": job["error"], "token": job["token"]})
+
+
+@app.route("/transcript/view/<token>")
+@login_required
+def transcript_view(token):
+    t = transcripts.get(token)
+    if not t or t["user_id"] != current_user.id:
+        return redirect(url_for("transcript"))
+    return render_template_string(
+        TRANSCRIPT_RESULT, user=current_user.name, token=token,
+        title=t["title"], src=t["source"], n=len(t["lines"]),
+        lines=_transcript_view_lines(t["lines"]))
+
+
+@app.route("/transcript/file/<token>.txt")
+@login_required
+def transcript_txt(token):
+    t = transcripts.get(token)
+    if not t or t["user_id"] != current_user.id:
+        return "Not found", 404
+    body = segments_to_txt(t["lines"], title=t["title"])
+    return Response(body, mimetype="text/plain; charset=utf-8",
+                    headers={"Content-Disposition":
+                             f"attachment; filename=transcript_{token}.txt"})
+
+
+@app.route("/transcript/file/<token>.srt")
+@login_required
+def transcript_srt(token):
+    t = transcripts.get(token)
+    if not t or t["user_id"] != current_user.id:
+        return "Not found", 404
+    body = segments_to_srt(t["lines"])
+    return Response(body, mimetype="text/plain; charset=utf-8",
+                    headers={"Content-Disposition":
+                             f"attachment; filename=transcript_{token}.srt"})
+
+
+@app.route("/inspect", methods=["GET", "POST"])
+@login_required
+def inspect():
+    if not user_can_generate(current_user):
+        return render_template_string(GATE_DENIED), 403
+    if request.method == "GET":
+        return render_template_string(INSPECT_FORM, user=current_user.name)
+    url = request.form.get("url", "").strip()
+    if not url or "http" not in url:
+        return render_template_string(INSPECT_FORM, user=current_user.name,
+                                      err="Please paste a valid YouTube URL.")
+    try:
+        meta = fetch_metadata(url)
+    except RuntimeError as exc:
+        return render_template_string(INSPECT_FORM, user=current_user.name,
+                                      err=str(exc))
+    hashtags = extract_hashtags(meta["title"], meta["description"])
+    return render_template_string(INSPECT_RESULT, user=current_user.name,
+                                  meta=meta, hashtags=hashtags)
 
 
 # --- routes -------------------------------------------------------------------
