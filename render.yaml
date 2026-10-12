@@ -1,0 +1,25 @@
+# Shorts Factory — Render Blueprint (free tier).
+#
+# Deploy: push this repo to GitHub, then in Render:
+#   New → Blueprint → connect the repo. Render reads this file
+#   and creates the Docker web service automatically.
+#
+# Free-tier notes (see README "Deploy to Render"):
+# - 512MB RAM → WHISPER_MODEL=tiny (smaller, faster, less accurate
+#   than "base"; upgrade the plan or set WHISPER_MODEL=base on a
+#   bigger instance for better subtitles).
+# - Sleeps after 15 min idle (~1 min to wake on first visit).
+# - 750 free hours/month — plenty for one always-on service.
+
+services:
+  - type: web
+    name: shorts-factory
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: WHISPER_MODEL
+        value: tiny
+      - key: PYTHONUNBUFFERED
+        value: 1

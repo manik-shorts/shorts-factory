@@ -1,0 +1,21 @@
+# Keep the Docker build context small — only app code ships to Hugging Face.
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Local run artifacts (regenerated at runtime)
+output/
+jobs/
+.work/
+instance/
+*.db
+*.log
+
+# Demo/test outputs from local development
+demo_*_shorts/
+user_link_shorts/
+
+# Dev leftovers
+.DS_Store
+.git/
