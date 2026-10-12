@@ -28,6 +28,7 @@ from flask_login import (LoginManager, UserMixin, current_user, login_required,
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from pipeline.runner import run_pipeline
+from pipeline.subtitles import STYLES, DEFAULT_STYLE
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "shorts_factory.db")
@@ -103,7 +104,7 @@ def user_can_generate(user):
 jobs = {}  # job_id -> dict(stage, done, total, error, result, user_id)
 
 
-def _job_worker(job_id, url, count):
+def _job_worker(job_id, url, count, style):
     job = jobs[job_id]
     work_dir = os.path.join(JOBS_DIR, job_id)
 
@@ -111,7 +112,8 @@ def _job_worker(job_id, url, count):
         job.update(stage=stage, done=done, total=total)
 
     try:
-        result = run_pipeline(url, work_dir, count=count, progress=progress)
+        result = run_pipeline(url, work_dir, count=count, style=style,
+                              progress=progress)
         job["result"] = result
         job["stage"] = "done"
     except RuntimeError as exc:
@@ -144,6 +146,9 @@ p.sub{color:#a7a7b3;margin:0 0 18px}
 input[type=text],input[type=url],input[type=email],input[type=password]{
   width:100%;padding:14px;border-radius:10px;border:1px solid #33333f;
   background:#101016;color:#fff;font-size:16px;margin:6px 0}
+select{width:100%;padding:14px;border-radius:10px;border:1px solid #33333f;
+  background:#101016;color:#fff;font-size:16px;margin:6px 0}
+label.lbl{display:block;font-size:13px;color:#a7a7b3;margin:10px 0 2px}
 button,.btn{display:block;width:100%;padding:14px;border:0;border-radius:10px;
   background:#e62117;color:#fff;font-size:17px;font-weight:700;margin:10px 0;
   text-align:center;text-decoration:none;cursor:pointer}
@@ -167,11 +172,15 @@ HOME = CSS + """
 <div class="wrap">
   <div class="top"><h1>🎬 Shorts Factory</h1>
     <span class="u">{{user}} · <a href="/logout">logout</a></span></div>
-  <p class="sub">Paste a YouTube link → get 10 vertical Shorts with karaoke subtitles.</p>
+  <p class="sub">Paste a YouTube link → get 10 vertical Shorts with subtitles.</p>
   <div class="card">
     <form action="/generate" method="post">
       <input type="url" name="url" required
              placeholder="https://www.youtube.com/watch?v=...">
+      <label class="lbl" for="style">💬 Subtitle style</label>
+      <select name="style" id="style">
+        {{style_options|safe}}
+      </select>
       <button type="submit">⚡ Generate 10 Shorts</button>
     </form>
     <p class="note">100% free: yt-dlp · faster-whisper · ffmpeg. No API keys.</p>
@@ -238,7 +247,7 @@ RESULTS = CSS + """
 <div class="wrap">
   <div class="top"><h1>✅ Your 10 Shorts</h1>
     <span class="u">{{user}} · <a href="/">new</a> · <a href="/logout">logout</a></span></div>
-  <p class="sub">{{title}}</p>
+  <p class="sub">{{title}}<br>💬 Subtitles: {{style_label}}</p>
   <div class="grid">
   {% for c in clips %}
     <div class="card">
@@ -261,11 +270,20 @@ unlock another 24 hours — coming soon.</p>
 
 
 # --- routes -------------------------------------------------------------------
+STYLE_OPTIONS = "".join(
+    f'<option value="{k}"'
+    f'{" selected" if k == DEFAULT_STYLE else ""}>'
+    f'{v["label"]}</option>'
+    for k, v in STYLES.items()
+)
+
+
 @app.route("/")
 def index():
     if not current_user.is_authenticated:
         return render_template_string(LANDING)
-    return render_template_string(HOME, user=current_user.name)
+    return render_template_string(HOME, user=current_user.name,
+                                  style_options=STYLE_OPTIONS)
 
 
 @app.route("/signup", methods=["GET", "POST"])
@@ -328,12 +346,16 @@ def generate():
     if not user_can_generate(current_user):
         return render_template_string(GATE_DENIED), 403
     url = request.form.get("url", "").strip()
+    style = request.form.get("style", DEFAULT_STYLE)
+    if style not in STYLES:
+        style = DEFAULT_STYLE
     if not url or "http" not in url:
         return redirect(url_for("index"))
     job_id = uuid.uuid4().hex[:12]
     jobs[job_id] = {"user_id": current_user.id, "stage": "starting",
-                    "done": 0, "total": 1, "error": None, "result": None}
-    t = threading.Thread(target=_job_worker, args=(job_id, url, 10),
+                    "done": 0, "total": 1, "error": None, "result": None,
+                    "style": style}
+    t = threading.Thread(target=_job_worker, args=(job_id, url, 10, style),
                          daemon=True)
     t.start()
     return redirect(url_for("progress", job_id=job_id))
@@ -364,8 +386,11 @@ def results(job_id):
     if not job or job["stage"] != "done":
         return redirect(url_for("index"))
     m = job["result"]["manifest"]
+    style_key = m.get("style", DEFAULT_STYLE)
+    style_label = STYLES.get(style_key, {}).get("label", style_key)
     return render_template_string(RESULTS, jid=job_id, clips=m["clips"],
-                                  title=m["title"], user=current_user.name)
+                                  title=m["title"], user=current_user.name,
+                                  style_label=style_label)
 
 
 @app.route("/health")

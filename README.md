@@ -83,7 +83,21 @@ python run.py "https://www.youtube.com/watch?v=..." --out ./my_shorts
 ```
 
 Options: `--out DIR` (default `./output`), `--count N` (default 10),
-`--work DIR` (temp working files, default `<out>/.work`).
+`--work DIR` (temp working files, default `<out>/.work`),
+`--style STYLE` (default `karaoke`).
+
+**Subtitle styles** (`--style`, or the picker on the web UI):
+
+| Style | Look |
+|---|---|
+| `karaoke` (default) | Word-by-word highlight: white → yellow sweep, black outline, bottom-center |
+| `clean` | Plain white text, black outline, whole line shown, bottom-center |
+| `pop` | Big bold yellow text, thick black outline, bottom-center |
+| `minimal` | Smaller white text, thin outline, lower-third position |
+
+All four are tuned for 1080×1920 and use the AI word timings —
+`karaoke` colors each word as it is spoken; the others show each full
+line during its spoken time range.
 
 ---
 
@@ -240,7 +254,7 @@ pipeline/highlights.py  – heuristic scoring, NO paid LLM:
                           opening bonus → top 10 non-overlapping windows,
                           max 3 per quarter so shorts spread across the video
    ▼  (for each of the 10 windows)
-pipeline/subtitles.py   – word timings → karaoke .ass
+pipeline/subtitles.py   – word timings → styled .ass (karaoke/clean/pop/minimal)
                           (white → yellow word-by-word, black outline,
                           bottom-center, tuned for 1080×1920)
    ▼
@@ -289,7 +303,7 @@ shorts_factory/
     ├── download.py      – yt-dlp download (≤1080p mp4)
     ├── transcribe.py    – faster-whisper, word timestamps, JSON cache
     ├── highlights.py    – heuristic highlight scoring
-    ├── subtitles.py     – karaoke .ass generation (1080×1920)
+    ├── subtitles.py     – styled .ass generation (karaoke/clean/pop/minimal, 1080×1920)
     └── render.py        – ffmpeg 9:16 crop + subtitle burn-in
 ```
 

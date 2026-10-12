@@ -3,6 +3,7 @@
 
 Usage:
     python run.py <youtube_url> [--out dir] [--count 10]
+                [--style karaoke|clean|pop|minimal]
 
 Downloads the video, transcribes it, finds the best highlight moments
 and renders vertical Shorts with karaoke subtitles into the output dir.
@@ -15,6 +16,7 @@ import sys
 import time
 
 from pipeline.runner import run_pipeline
+from pipeline.subtitles import STYLES, DEFAULT_STYLE
 
 
 def main():
@@ -24,6 +26,8 @@ def main():
                     help="output directory (default: ./output)")
     ap.add_argument("--count", type=int, default=10,
                     help="number of shorts to make (default: 10)")
+    ap.add_argument("--style", default=DEFAULT_STYLE, choices=list(STYLES),
+                    help=f"subtitle style (default: {DEFAULT_STYLE})")
     ap.add_argument("--work", default=None,
                     help="working directory (default: <out>/.work)")
     args = ap.parse_args()
@@ -40,10 +44,11 @@ def main():
         else:
             print(f"  [{stage}] ...", flush=True)
 
-    print(f"URL: {args.url}")
+    print(f"URL: {args.url}  (style: {args.style})")
     try:
         result = run_pipeline(args.url, work_dir,
-                              count=args.count, progress=progress)
+                              count=args.count, style=args.style,
+                              progress=progress)
     except RuntimeError as exc:
         print(f"\nERROR: {exc}", file=sys.stderr)
         sys.exit(1)

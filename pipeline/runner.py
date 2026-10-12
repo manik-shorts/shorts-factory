@@ -8,20 +8,26 @@ import os
 from .download import download_video
 from .transcribe import transcribe
 from .highlights import find_highlights
-from .subtitles import write_ass
+from .subtitles import write_ass, STYLES
 from .render import render_short
 
 
-def run_pipeline(url, work_dir, count=10, progress=None):
+def run_pipeline(url, work_dir, count=10, style="karaoke", progress=None):
     """Run the whole pipeline.
 
     ``progress`` is an optional callable(stage: str, done: int, total: int)
     used by the web UI to report live progress. Stages: "download",
     "transcribe", "highlights", "render".
 
+    ``style``: subtitle style preset — one of "karaoke" (default),
+    "clean", "pop", "minimal" (see pipeline/subtitles.py STYLES).
+
     Returns dict: {title, duration, video_id, clips: [paths...]}.
     Raises RuntimeError with a readable message on failure.
     """
+    if style not in STYLES:
+        raise RuntimeError(f"Unknown subtitle style: {style!r} "
+                           f"(choices: {', '.join(STYLES)})")
     def emit(stage, done=0, total=1):
         if progress:
             progress(stage, done, total)
@@ -50,7 +56,7 @@ def run_pipeline(url, work_dir, count=10, progress=None):
         emit("render", i - 1, len(clips))
         ass_path = os.path.join(work_dir, f"short_{i:02d}.ass")
         out_path = os.path.join(work_dir, f"short_{i:02d}.mp4")
-        write_ass(words, clip["start"], clip["end"], ass_path)
+        write_ass(words, clip["start"], clip["end"], ass_path, style=style)
         render_short(meta["path"], clip["start"], clip["end"],
                      ass_path, out_path)
         out_paths.append(out_path)
@@ -61,6 +67,7 @@ def run_pipeline(url, work_dir, count=10, progress=None):
         "title": meta["title"],
         "duration": meta["duration"],
         "video_id": meta["video_id"],
+        "style": style,
         "clips": [
             {"file": os.path.basename(p), "start": c["start"],
              "end": c["end"], "score": c["score"], "reason": c["reason"]}
