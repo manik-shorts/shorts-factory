@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Flask / app secrets and local data
+instance/
+*.db
+*.sqlite
+*.sqlite3
+secret.key
+.env
+
+# Generated outputs (local only, never commit)
+jobs/
+demo_*_shorts/
+user_link_shorts/
+transcript_jobs/
+*.mp4
+*.srt
+*.txt
+!requirements.txt
+
+# OS / editor
+.DS_Store
+Thumbs.db
