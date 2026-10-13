@@ -32,8 +32,9 @@ def render_short(source_path, start, end, ass_path, out_path):
         "x='(iw-ow)/2':"
         "y='max(0,(ih-oh)/2-40)'"
     )
-    vf = (f"{crop},scale=1080:1920:flags=lanczos,setsar=1,"
-          f"ass='{_escape_filter_path(ass_path)}'")
+    vf = (f"{crop},scale=1080:1920:flags=lanczos,setsar=1")
+    if ass_path:
+        vf += f",ass='{_escape_filter_path(ass_path)}'"
 
     cmd = [
         "ffmpeg", "-y", "-v", "error",

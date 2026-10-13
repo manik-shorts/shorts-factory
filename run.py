@@ -26,8 +26,10 @@ def main():
                     help="output directory (default: ./output)")
     ap.add_argument("--count", type=int, default=10,
                     help="number of shorts to make (default: 10)")
-    ap.add_argument("--style", default=DEFAULT_STYLE, choices=list(STYLES),
-                    help=f"subtitle style (default: {DEFAULT_STYLE})")
+    ap.add_argument("--style", default=DEFAULT_STYLE,
+                    choices=[*STYLES, "none"],
+                    help=f"subtitle style (default: {DEFAULT_STYLE}); "
+                         f"'none' burns in no subtitles")
     ap.add_argument("--work", default=None,
                     help="working directory (default: <out>/.work)")
     args = ap.parse_args()

@@ -9,6 +9,10 @@ from .download import download_video
 from .transcribe import transcribe
 from .highlights import find_highlights
 from .subtitles import write_ass, STYLES
+
+#: All accepted --style values: the 4 subtitle presets plus "none"
+#: (no subtitles burned in).
+VALID_STYLES = (*STYLES, "none")
 from .render import render_short
 
 
@@ -20,14 +24,15 @@ def run_pipeline(url, work_dir, count=10, style="karaoke", progress=None):
     "transcribe", "highlights", "render".
 
     ``style``: subtitle style preset — one of "karaoke" (default),
-    "clean", "pop", "minimal" (see pipeline/subtitles.py STYLES).
+    "clean", "pop", "minimal", or "none" (no subtitles burned in;
+    see pipeline/subtitles.py STYLES).
 
     Returns dict: {title, duration, video_id, clips: [paths...]}.
     Raises RuntimeError with a readable message on failure.
     """
-    if style not in STYLES:
+    if style not in VALID_STYLES:
         raise RuntimeError(f"Unknown subtitle style: {style!r} "
-                           f"(choices: {', '.join(STYLES)})")
+                           f"(choices: {', '.join(VALID_STYLES)})")
     def emit(stage, done=0, total=1):
         if progress:
             progress(stage, done, total)
@@ -54,9 +59,13 @@ def run_pipeline(url, work_dir, count=10, style="karaoke", progress=None):
     out_paths = []
     for i, clip in enumerate(clips, 1):
         emit("render", i - 1, len(clips))
-        ass_path = os.path.join(work_dir, f"short_{i:02d}.ass")
         out_path = os.path.join(work_dir, f"short_{i:02d}.mp4")
-        write_ass(words, clip["start"], clip["end"], ass_path, style=style)
+        if style == "none":
+            ass_path = None
+        else:
+            ass_path = os.path.join(work_dir, f"short_{i:02d}.ass")
+            write_ass(words, clip["start"], clip["end"], ass_path,
+                      style=style)
         render_short(meta["path"], clip["start"], clip["end"],
                      ass_path, out_path)
         out_paths.append(out_path)

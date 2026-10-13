@@ -94,10 +94,12 @@ Options: `--out DIR` (default `./output`), `--count N` (default 10),
 | `clean` | Plain white text, black outline, whole line shown, bottom-center |
 | `pop` | Big bold yellow text, thick black outline, bottom-center |
 | `minimal` | Smaller white text, thin outline, lower-third position |
+| `none` | 🚫 No subtitles burned in at all |
 
-All four are tuned for 1080×1920 and use the AI word timings —
+All four text styles are tuned for 1080×1920 and use the AI word timings —
 `karaoke` colors each word as it is spoken; the others show each full
-line during its spoken time range.
+line during its spoken time range. `none` skips subtitle generation
+entirely.
 
 ---
 

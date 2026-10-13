@@ -615,7 +615,7 @@ STYLE_OPTIONS = "".join(
     f'{" selected" if k == DEFAULT_STYLE else ""}>'
     f'{v["label"]}</option>'
     for k, v in STYLES.items()
-)
+) + '<option value="none">🚫 No subtitles</option>'
 
 
 @app.route("/")
@@ -687,7 +687,7 @@ def generate():
         return render_template_string(GATE_DENIED), 403
     url = request.form.get("url", "").strip()
     style = request.form.get("style", DEFAULT_STYLE)
-    if style not in STYLES:
+    if style not in STYLES and style != "none":
         style = DEFAULT_STYLE
     if not url or "http" not in url:
         return redirect(url_for("index"))
@@ -727,7 +727,8 @@ def results(job_id):
         return redirect(url_for("index"))
     m = job["result"]["manifest"]
     style_key = m.get("style", DEFAULT_STYLE)
-    style_label = STYLES.get(style_key, {}).get("label", style_key)
+    style_label = ("🚫 No subtitles" if style_key == "none"
+                   else STYLES.get(style_key, {}).get("label", style_key))
     return render_template_string(RESULTS, jid=job_id, clips=m["clips"],
                                   title=m["title"], user=current_user.name,
                                   style_label=style_label)
