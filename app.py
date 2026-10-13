@@ -907,6 +907,129 @@ def download(job_id, filename):
     return send_file(path, as_attachment=True)
 
 
+# --- JSON API (for the native Android client) -------------------------------
+# Same session-cookie auth as the web UI (Flask-Login). The Android app
+# keeps the cookie jar; all /api/* calls below need a logged-in session.
+
+
+@login_manager.unauthorized_handler
+def _unauthorized():
+    if request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": "login_required"}), 401
+    return redirect(url_for("login"))
+
+
+def _api_body():
+    """Accept JSON or form bodies from API clients."""
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else request.form
+
+
+@app.route("/api/signup", methods=["POST"])
+def api_signup():
+    body = _api_body()
+    name = str(body.get("name", "")).strip()
+    email = str(body.get("email", "")).strip().lower()
+    pw = str(body.get("password", ""))
+    if not name or not email or len(pw) < 6:
+        return jsonify({"ok": False,
+                        "error": "Fill every field (password min 6 chars)."}), 400
+    try:
+        with db() as conn:
+            cur = conn.execute(
+                "INSERT INTO users (name, email, password_hash)"
+                " VALUES (?, ?, ?)",
+                (name, email, generate_password_hash(pw)))
+            user_id = cur.lastrowid
+        with db() as conn:
+            row = conn.execute("SELECT * FROM users WHERE id = ?",
+                               (user_id,)).fetchone()
+        login_user(User(row))
+        return jsonify({"ok": True, "name": name})
+    except sqlite3.IntegrityError:
+        return jsonify({"ok": False,
+                        "error": "That email is already registered."}), 409
+
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    body = _api_body()
+    email = str(body.get("email", "")).strip().lower()
+    pw = str(body.get("password", ""))
+    with db() as conn:
+        row = conn.execute("SELECT * FROM users WHERE email = ?",
+                           (email,)).fetchone()
+    if row and check_password_hash(row["password_hash"], pw):
+        login_user(User(row))
+        return jsonify({"ok": True, "name": row["name"]})
+    return jsonify({"ok": False,
+                    "error": "Wrong email or password."}), 401
+
+
+@app.route("/api/logout", methods=["POST"])
+@login_required
+def api_logout():
+    logout_user()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/generate", methods=["POST"])
+@login_required
+def api_generate():
+    if not user_can_generate(current_user):
+        return jsonify({"ok": False, "error": "access_expired"}), 403
+    body = _api_body()
+    url = str(body.get("url", "")).strip()
+    style = str(body.get("style", DEFAULT_STYLE))
+    if style not in STYLES and style != "none":
+        style = DEFAULT_STYLE
+    if not url or "http" not in url:
+        return jsonify({"ok": False, "error": "Invalid YouTube URL."}), 400
+    job_id = uuid.uuid4().hex[:12]
+    jobs[job_id] = {"user_id": current_user.id, "stage": "starting",
+                    "done": 0, "total": 1, "error": None, "result": None,
+                    "style": style}
+    t = threading.Thread(target=_job_worker, args=(job_id, url, 10, style),
+                         daemon=True)
+    t.start()
+    return jsonify({"ok": True, "job_id": job_id})
+
+
+@app.route("/api/status/<job_id>")
+@login_required
+def api_status(job_id):
+    job = _job_or_404(job_id)
+    if not job:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    return jsonify({"ok": True, "stage": job["stage"], "done": job["done"],
+                    "total": job["total"], "error": job["error"]})
+
+
+@app.route("/api/results/<job_id>")
+@login_required
+def api_results(job_id):
+    job = _job_or_404(job_id)
+    if not job or job["stage"] != "done":
+        return jsonify({"ok": False, "error": "not_ready"}), 404
+    m = job["result"]["manifest"]
+    style_key = m.get("style", DEFAULT_STYLE)
+    style_label = ("No subtitles" if style_key == "none"
+                   else STYLES.get(style_key, {}).get("label", style_key))
+    base = request.host_url.rstrip("/")
+    return jsonify({
+        "ok": True,
+        "title": m["title"],
+        "style": style_key,
+        "style_label": style_label,
+        "clips": [
+            {"file": c["file"], "start": c["start"], "end": c["end"],
+             "reason": c["reason"],
+             "url": f"{base}/download/{job_id}/{c['file']}"}
+            for c in m["clips"]
+        ],
+    })
+
+
 if __name__ == "__main__":
     init_db()
     os.makedirs(JOBS_DIR, exist_ok=True)
