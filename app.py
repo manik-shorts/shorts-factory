@@ -1030,6 +1030,64 @@ def api_results(job_id):
     })
 
 
+@app.route("/api/transcript")
+@login_required
+def api_transcript():
+    """JSON transcript (YouTube captions fast path).
+
+    GET /api/transcript?url=<youtube-link>
+    -> {ok:true, title, source, lines:[{t, clock, text}]}
+    -> {ok:false, error:"no_captions"} when the video has no captions
+       (the web UI falls back to AI transcription; the mobile app
+       should show a friendly message for this case).
+    """
+    from pipeline.inspect import fmt_clock
+    url = request.args.get("url", "").strip()
+    if not url or "http" not in url:
+        return jsonify({"ok": False, "error": "Invalid YouTube URL."}), 400
+    work_dir = os.path.join(BASE_DIR, "transcript_jobs",
+                            "api_" + uuid.uuid4().hex[:8])
+    try:
+        lines, source = fetch_captions(url, work_dir)
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)[:300]}), 502
+    if not lines:
+        return jsonify({"ok": False, "error": "no_captions"}), 404
+    try:
+        title = fetch_metadata(url)["title"]
+    except Exception:
+        title = url
+    return jsonify({
+        "ok": True,
+        "title": title,
+        "source": source,
+        "lines": [{"t": round(l["start"], 2),
+                   "clock": fmt_clock(l["start"]),
+                   "text": l["text"]} for l in lines],
+    })
+
+
+@app.route("/api/inspect")
+@login_required
+def api_inspect():
+    """JSON video metadata.
+
+    GET /api/inspect?url=<youtube-link>
+    -> {ok:true, meta:{title, channel, duration_str, view_count,
+       like_count, upload_date, description, tags, webpage_url},
+       hashtags:[...]}
+    """
+    url = request.args.get("url", "").strip()
+    if not url or "http" not in url:
+        return jsonify({"ok": False, "error": "Invalid YouTube URL."}), 400
+    try:
+        meta = fetch_metadata(url)
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)[:300]}), 502
+    hashtags = extract_hashtags(meta["title"], meta["description"])
+    return jsonify({"ok": True, "meta": meta, "hashtags": hashtags})
+
+
 if __name__ == "__main__":
     init_db()
     os.makedirs(JOBS_DIR, exist_ok=True)
