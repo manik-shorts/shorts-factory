@@ -9,7 +9,12 @@ import subprocess
 
 
 def _escape_filter_path(path):
-    # Inside single quotes in a filtergraph, escape ' and handle ':'.
+    # Windows backslashes are escape characters inside a filtergraph and
+    # mangle the path (libass then fails with "Could not create a libass
+    # track"). ffmpeg accepts forward slashes on Windows, so normalize
+    # them first. Inside single quotes in a filtergraph, also escape '
+    # and handle ':' (drive-letter colon).
+    path = path.replace("\\", "/")
     return path.replace("'", r"'\''").replace(":", r"\:")
 
 
