@@ -140,121 +140,246 @@ def _job_or_404(job_id):
 # --- HTML --------------------------------------------------------------------
 CSS = """
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
+:root{
+  --bg:#08080f; --card:rgba(255,255,255,.045); --line:rgba(255,255,255,.09);
+  --txt:#f4f4fa; --mut:#9c9cb4; --acc1:#ff3d5a; --acc2:#a855f7;
+  --grad:linear-gradient(135deg,#ff3d5a,#a855f7);
+}
 *{box-sizing:border-box}
-body{font-family:-apple-system,system-ui,Segoe UI,Roboto,Arial,sans-serif;
-     margin:0;background:#0f0f14;color:#f2f2f5}
-.wrap{max-width:560px;margin:0 auto;padding:20px 16px 40px}
-h1{font-size:26px;margin:8px 0 4px}
-p.sub{color:#a7a7b3;margin:0 0 18px}
-.card{background:#1a1a22;border:1px solid #2a2a35;border-radius:14px;
-      padding:18px;margin:14px 0}
+body{font-family:Inter,-apple-system,system-ui,'Segoe UI',Roboto,Arial,sans-serif;
+  margin:0;color:var(--txt);min-height:100vh;
+  background:
+    radial-gradient(900px 480px at 15% -5%,rgba(168,85,247,.16),transparent 60%),
+    radial-gradient(800px 420px at 90% 10%,rgba(255,61,90,.12),transparent 60%),
+    var(--bg);}
+.wrap{max-width:640px;margin:0 auto;padding:22px 18px 56px}
+h1{font-size:28px;font-weight:800;margin:10px 0 6px;letter-spacing:-.5px}
+.grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+p.sub{color:var(--mut);margin:0 0 20px;font-size:15px;line-height:1.55}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;
+  padding:22px;margin:16px 0;backdrop-filter:blur(14px);
+  box-shadow:0 12px 40px rgba(0,0,0,.35)}
 input[type=text],input[type=url],input[type=email],input[type=password]{
-  width:100%;padding:14px;border-radius:10px;border:1px solid #33333f;
-  background:#101016;color:#fff;font-size:16px;margin:6px 0}
-select{width:100%;padding:14px;border-radius:10px;border:1px solid #33333f;
-  background:#101016;color:#fff;font-size:16px;margin:6px 0}
-label.lbl{display:block;font-size:13px;color:#a7a7b3;margin:10px 0 2px}
-button,.btn{display:block;width:100%;padding:14px;border:0;border-radius:10px;
-  background:#e62117;color:#fff;font-size:17px;font-weight:700;margin:10px 0;
-  text-align:center;text-decoration:none;cursor:pointer}
-button:disabled{background:#555}
-a{color:#7ab8ff}
-.top{display:flex;justify-content:space-between;align-items:center}
-.top .u{color:#a7a7b3;font-size:14px}
-.bar{height:10px;background:#2a2a35;border-radius:6px;overflow:hidden;margin:12px 0}
-.bar>div{height:100%;background:#e62117;width:0%;transition:width .4s}
-video{width:100%;max-height:60vh;border-radius:12px;background:#000}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.grid .card{padding:10px;margin:0}
-.grid video{max-height:38vh}
-.err{background:#3a1215;border:1px solid #7a1f1f;color:#ffb4b4;
-     padding:12px;border-radius:10px}
-.note{font-size:13px;color:#a7a7b3}
+  width:100%;padding:15px 16px;border-radius:14px;border:1px solid var(--line);
+  background:rgba(0,0,0,.35);color:#fff;font-size:16px;margin:6px 0;
+  font-family:inherit;transition:border .2s,box-shadow .2s}
+input:focus{outline:none;border-color:var(--acc2);box-shadow:0 0 0 3px rgba(168,85,247,.25)}
+label.lbl{display:block;font-size:13px;font-weight:600;color:var(--mut);
+  margin:14px 0 8px;letter-spacing:.3px}
+button,.btn{display:block;width:100%;padding:15px;border:0;border-radius:14px;
+  background:var(--grad);color:#fff;font-size:16px;font-weight:700;margin:12px 0;
+  text-align:center;text-decoration:none;cursor:pointer;font-family:inherit;
+  box-shadow:0 8px 28px rgba(255,61,90,.35);transition:transform .15s,box-shadow .15s}
+button:hover,.btn:hover{transform:translateY(-1px);box-shadow:0 12px 34px rgba(255,61,90,.45)}
+button:disabled{background:#3a3a48;box-shadow:none;cursor:default}
+.btn.ghost{background:rgba(255,255,255,.07);box-shadow:none;border:1px solid var(--line)}
+a{color:#c4b5fd}
+.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(16px);
+  background:rgba(8,8,15,.72);border-bottom:1px solid var(--line);margin:-22px -18px 18px;
+  padding:14px 18px}
+.nav .row{display:flex;justify-content:space-between;align-items:center;max-width:640px;margin:0 auto}
+.logo{font-weight:800;font-size:18px;letter-spacing:-.3px}
+.logo span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.nav .u{color:var(--mut);font-size:13px}
+.tabs{display:flex;gap:8px;margin-top:12px}
+.tab{flex:1;text-align:center;padding:10px;border-radius:12px;font-size:14px;font-weight:600;
+  color:var(--mut);text-decoration:none;background:rgba(255,255,255,.04);
+  border:1px solid transparent;transition:all .2s}
+.tab.on{color:#fff;background:rgba(168,85,247,.16);border-color:rgba(168,85,247,.4)}
+.bar{height:12px;background:rgba(255,255,255,.07);border-radius:8px;overflow:hidden;margin:14px 0}
+.bar>div{height:100%;background:var(--grad);width:0%;transition:width .4s;border-radius:8px}
+video{width:100%;max-height:60vh;border-radius:14px;background:#000;display:block}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:480px){.grid{grid-template-columns:1fr}}
+.scard{background:var(--card);border:1px solid var(--line);border-radius:18px;
+  padding:12px;backdrop-filter:blur(14px);transition:transform .18s,box-shadow .18s}
+.scard:hover{transform:translateY(-3px);box-shadow:0 16px 44px rgba(0,0,0,.45)}
+.scard .meta{font-size:12.5px;color:var(--mut);margin:8px 2px;line-height:1.5}
+.scard .btn{padding:11px;font-size:14px;margin:8px 0 2px}
+.err{background:rgba(255,61,90,.12);border:1px solid rgba(255,61,90,.4);color:#ffb4c0;
+  padding:13px 16px;border-radius:14px;font-size:14px}
+.note{font-size:13px;color:var(--mut);line-height:1.6}
+.badge{display:inline-block;font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;
+  background:rgba(168,85,247,.18);border:1px solid rgba(168,85,247,.45);color:#d8b4fe}
+/* style pills */
+.pills{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+@media(max-width:520px){.pills{grid-template-columns:repeat(3,1fr)}}
+.pill{cursor:pointer}
+.pill input{display:none}
+.pill .pb{border:1.5px solid var(--line);border-radius:14px;padding:12px 6px;text-align:center;
+  background:rgba(255,255,255,.03);transition:all .2s;height:100%}
+.pill .pi{font-size:22px;display:block;margin-bottom:4px}
+.pill .pt{font-size:12.5px;font-weight:700;display:block}
+.pill input:checked+.pb{border-color:var(--acc2);background:rgba(168,85,247,.14);
+  box-shadow:0 0 18px rgba(168,85,247,.3)}
+/* progress steps */
+.steps{display:flex;gap:6px;margin:16px 0}
+.step{flex:1;text-align:center;font-size:11.5px;color:var(--mut);font-weight:600}
+.step .dot{width:34px;height:34px;border-radius:50%;margin:0 auto 6px;display:flex;
+  align-items:center;justify-content:center;background:rgba(255,255,255,.06);
+  border:1.5px solid var(--line);font-size:15px;transition:all .3s}
+.step.act{color:#fff}
+.step.act .dot{border-color:var(--acc2);background:rgba(168,85,247,.2);
+  box-shadow:0 0 16px rgba(168,85,247,.45);animation:pulse 1.4s infinite}
+.step.done{color:#8f8fa8}
+.step.done .dot{border-color:#22c55e;background:rgba(34,197,94,.15)}
+@keyframes pulse{50%{transform:scale(1.1)}}
+/* feature cards */
+.feats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:20px 0}
+@media(max-width:520px){.feats{grid-template-columns:1fr}}
+.feat{background:var(--card);border:1px solid var(--line);border-radius:18px;
+  padding:18px 14px;text-align:center;backdrop-filter:blur(14px)}
+.feat .fi{font-size:30px;display:block;margin-bottom:8px}
+.feat b{font-size:14px;display:block;margin-bottom:4px}
+.feat span{font-size:12.5px;color:var(--mut);line-height:1.5}
+/* hero */
+.hero{text-align:center;padding:34px 0 10px}
+.hero h1{font-size:40px;line-height:1.12;margin:0 0 12px}
+.hero p{color:var(--mut);font-size:16px;line-height:1.6;margin:0 0 6px}
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
+.stat{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:14px;
+  padding:12px 8px;text-align:center}
+.stat b{font-size:16px;display:block}
+.stat span{font-size:11.5px;color:var(--mut)}
+/* transcript lines */
+.tline{margin:0;padding:10px 4px;border-bottom:1px solid rgba(255,255,255,.05);
+  line-height:1.6;font-size:14.5px}
+.tline:last-child{border-bottom:0}
+.ts{color:#c4b5fd;text-decoration:none;font-size:12.5px;font-weight:600;
+  background:rgba(168,85,247,.14);padding:3px 9px;border-radius:8px;margin-right:8px}
+details{margin-top:10px}
+summary{cursor:pointer;color:#c4b5fd;font-size:14px;font-weight:600}
+.chip{display:inline-block;background:rgba(168,85,247,.13);border:1px solid rgba(168,85,247,.35);
+  border-radius:20px;padding:5px 13px;font-size:13.5px;margin:3px;cursor:pointer;color:#e6dcff}
+.chip:active{background:rgba(168,85,247,.3)}
+.rowbtns{display:flex;gap:10px}
+.rowbtns>*{margin:0}
+.spin{width:44px;height:44px;border-radius:50%;margin:6px auto;
+  border:4px solid rgba(168,85,247,.2);border-top-color:#a855f7;animation:rot 1s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
 </style>
 """
 
 NAV = """
-<div class="top"><h1>🎬 Shorts Factory</h1>
-  <span class="u">{{user}} · <a href="/logout">logout</a></span></div>
-<nav style="display:flex;gap:8px;margin:10px 0 4px">
-  <a class="btn" style="padding:10px;font-size:15px;margin:0" href="/">🎬 Shorts</a>
-  <a class="btn" style="padding:10px;font-size:15px;margin:0;background:#33333f"
-     href="/transcript">📝 Transcript</a>
-  <a class="btn" style="padding:10px;font-size:15px;margin:0;background:#33333f"
-     href="/inspect">🔍 Inspect</a>
-</nav>
+<div class="nav"><div class="row">
+  <div class="logo">🎬 Shorts <span>Factory</span></div>
+  <div class="u">{{user}} · <a href="/logout">logout</a></div>
+</div><div class="row"><div class="tabs" style="width:100%">
+  <a class="tab {{'on' if activetab=='shorts' else ''}}" href="/">🎬 Shorts</a>
+  <a class="tab {{'on' if activetab=='transcript' else ''}}" href="/transcript">📝 Transcript</a>
+  <a class="tab {{'on' if activetab=='inspect' else ''}}" href="/inspect">🔍 Inspect</a>
+</div></div></div>
 """
 
 HOME = CSS + """
 <div class="wrap">
 """ + NAV + """
-  <p class="sub">Paste a YouTube link → get 10 vertical Shorts with subtitles.</p>
+  <div class="hero" style="padding-top:10px">
+    <h1>Turn any video into<br><span class="grad">10 viral Shorts</span></h1>
+    <p class="sub" style="margin-bottom:6px">AI finds the highlights, cuts vertical clips and burns in karaoke subtitles — automatically.</p>
+  </div>
   <div class="card">
     <form action="/generate" method="post">
+      <label class="lbl" style="margin-top:0">🔗 YouTube link</label>
       <input type="url" name="url" required
              placeholder="https://www.youtube.com/watch?v=...">
-      <label class="lbl" for="style">💬 Subtitle style</label>
-      <select name="style" id="style">
-        {{style_options|safe}}
-      </select>
+      <label class="lbl">💬 Subtitle style</label>
+      <div class="pills">{{style_pills|safe}}</div>
       <button type="submit">⚡ Generate 10 Shorts</button>
     </form>
-    <p class="note">100% free: yt-dlp · faster-whisper · ffmpeg. No API keys.</p>
+    <p class="note" style="text-align:center;margin-bottom:0">🆓 100% free · yt-dlp · faster-whisper · ffmpeg · no API keys</p>
   </div>
 </div>
 """
 
 LANDING = CSS + """
 <div class="wrap">
-  <h1>🎬 Shorts Factory</h1>
-  <p class="sub">Turn any YouTube video into 10 vertical Shorts with karaoke subtitles — free.</p>
-  <div class="card">
-    <a class="btn" href="/login">Log in</a>
-    <a class="btn" href="/signup" style="background:#33333f">Create account</a>
+  <div class="hero">
+    <h1>🎬 Shorts <span class="grad">Factory</span></h1>
+    <p>Turn any YouTube video into <b style="color:#fff">10 vertical Shorts</b><br>
+    with karaoke subtitles — free, no API keys, yours to keep.</p>
+  </div>
+  <div class="feats">
+    <div class="feat"><span class="fi">⚡</span><b>Auto highlights</b><span>AI scores every moment and cuts the 10 best clips</span></div>
+    <div class="feat"><span class="fi">🎤</span><b>Karaoke subtitles</b><span>Word-by-word highlighting in 4 styles — or none</span></div>
+    <div class="feat"><span class="fi">📝</span><b>Bonus tools</b><span>Transcript viewer + video inspector built in</span></div>
+  </div>
+  <div class="card" style="text-align:center">
+    <a class="btn" href="/signup">🚀 Create free account</a>
+    <a class="btn ghost" href="/login">Log in</a>
   </div>
 </div>
 """
 
 SIGNUP = CSS + """
-<div class="wrap"><h1>Create account</h1>
-{% if err %}<div class="err">{{err}}</div>{% endif %}
-<div class="card"><form method="post">
-  <input type="text" name="name" required placeholder="Your name">
-  <input type="email" name="email" required placeholder="Email">
-  <input type="password" name="password" required minlength="6"
-         placeholder="Password (min 6 chars)">
-  <button type="submit">Sign up</button>
-</form><p class="note">Already have an account? <a href="/login">Log in</a></p></div></div>
+<div class="wrap">
+  <div class="hero" style="padding-top:16px"><h1 style="font-size:32px">Create your <span class="grad">account</span></h1></div>
+  {% if err %}<div class="err">{{err}}</div>{% endif %}
+  <div class="card"><form method="post">
+    <input type="text" name="name" required placeholder="Your name">
+    <input type="email" name="email" required placeholder="Email">
+    <input type="password" name="password" required minlength="6"
+           placeholder="Password (min 6 chars)">
+    <button type="submit">✨ Sign up free</button>
+  </form><p class="note" style="text-align:center">Already have an account? <a href="/login">Log in</a></p></div>
+</div>
 """
 
 LOGIN = CSS + """
-<div class="wrap"><h1>Log in</h1>
-{% if err %}<div class="err">{{err}}</div>{% endif %}
-<div class="card"><form method="post">
-  <input type="email" name="email" required placeholder="Email">
-  <input type="password" name="password" required placeholder="Password">
-  <button type="submit">Log in</button>
-</form><p class="note">No account yet? <a href="/signup">Sign up</a></p></div></div>
+<div class="wrap">
+  <div class="hero" style="padding-top:16px"><h1 style="font-size:32px">Welcome <span class="grad">back</span></h1></div>
+  {% if err %}<div class="err">{{err}}</div>{% endif %}
+  <div class="card"><form method="post">
+    <input type="email" name="email" required placeholder="Email">
+    <input type="password" name="password" required placeholder="Password">
+    <button type="submit">Log in</button>
+  </form><p class="note" style="text-align:center">No account yet? <a href="/signup">Sign up free</a></p></div>
+</div>
 """
 
 PROGRESS = CSS + """
-<div class="wrap"><h1>Working… ⏳</h1>
-<p class="sub" id="msg">Starting…</p>
-<div class="bar"><div id="fill"></div></div>
-<p class="note">This can take several minutes (download + AI transcription +
-rendering 10 clips). Keep this page open.</p></div>
+<div class="wrap">
+  <div class="hero" style="padding-top:16px"><h1 style="font-size:30px">Cooking your <span class="grad">Shorts</span>…</h1></div>
+  <div class="card" style="text-align:center">
+    <div class="spin"></div>
+    <p class="sub" id="msg" style="margin:10px 0 0;font-weight:600;color:#fff">Starting…</p>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="steps">
+      <div class="step" id="s-download"><div class="dot">⬇</div>Download</div>
+      <div class="step" id="s-transcribe"><div class="dot">🎤</div>Transcribe</div>
+      <div class="step" id="s-highlights"><div class="dot">✨</div>Highlights</div>
+      <div class="step" id="s-render"><div class="dot">🎬</div>Render</div>
+    </div>
+    <p class="note">Takes a few minutes — download + AI transcription + 10 renders.<br>Keep this page open ☕</p>
+  </div>
+</div>
 <script>
 const jid="{{jid}}";
+const order=["download","transcribe","highlights","render"];
+const labels={download:"Downloading video…",transcribe:"AI is transcribing speech…",
+  highlights:"Finding the best moments…",render:"Rendering your Shorts…"};
 async function tick(){
   const r=await fetch("/status/"+jid); const s=await r.json();
-  document.getElementById("msg").textContent=
-    s.stage==="error" ? "Error: "+s.error :
-    s.stage==="done"  ? "Done!" : "Stage: "+s.stage+" ("+s.done+"/"+s.total+")";
-  if(s.total>0) document.getElementById("fill").style.width=
+  if(s.stage==="error"){
+    document.getElementById("msg").textContent="❌ "+s.error;
+    document.querySelector(".spin").style.display="none";return;
+  }
+  if(s.stage==="done"){location.href="/results/"+jid;return;}
+  document.getElementById("msg").textContent=labels[s.stage]||s.stage;
+  if(s.total>0)document.getElementById("fill").style.width=
     Math.round(100*s.done/Math.max(s.total,1))+"%";
-  if(s.stage==="done") location.href="/results/"+jid;
-  else if(s.stage!=="error") setTimeout(tick,2000);
+  const cur=order.indexOf(s.stage);
+  order.forEach((k,i)=>{
+    const el=document.getElementById("s-"+k);
+    el.classList.toggle("act",i===cur);
+    el.classList.toggle("done",i<cur);
+    if(i<cur)el.querySelector(".dot").textContent="✓";
+  });
+  setTimeout(tick,2000);
 }
 tick();
 </script>
@@ -262,33 +387,40 @@ tick();
 
 RESULTS = CSS + """
 <div class="wrap">
-  <div class="top"><h1>✅ Your 10 Shorts</h1>
-    <span class="u">{{user}} · <a href="/">new</a> · <a href="/logout">logout</a></span></div>
-  <p class="sub">{{title}}<br>💬 Subtitles: {{style_label}}</p>
+  <div class="top" style="display:flex;justify-content:space-between;align-items:center">
+    <h1 style="margin:0">✅ Your <span class="grad">Shorts</span></h1>
+    <span class="u" style="color:var(--mut);font-size:13px">{{user}} · <a href="/">+ new</a></span>
+  </div>
+  <p class="sub">{{title}}</p>
+  <p style="margin:-8px 0 6px"><span class="badge">💬 {{style_label}}</span></p>
   <div class="grid">
   {% for c in clips %}
-    <div class="card">
+    <div class="scard">
       <video src="/download/{{jid}}/{{c.file}}" controls preload="metadata" playsinline></video>
-      <p class="note">#{{loop.index}} · {{c.start}}s–{{c.end}}s<br>{{c.reason}}</p>
-      <a class="btn" style="padding:10px;font-size:15px"
-         href="/download/{{jid}}/{{c.file}}" download>⬇ Download</a>
+      <p class="meta"><b style="color:#fff">#{{loop.index}}</b> · {{c.start}}s–{{c.end}}s<br>{{c.reason}}</p>
+      <a class="btn" href="/download/{{jid}}/{{c.file}}" download>⬇ Download</a>
     </div>
   {% endfor %}
+  </div>
+  <div class="card" style="text-align:center">
+    <a class="btn ghost" href="/">🎬 Make more Shorts</a>
   </div>
 </div>
 """
 
 GATE_DENIED = CSS + """
-<div class="wrap"><h1>⏳ Free access expired</h1>
-<p class="sub">Your free generation window has ended. Watch a short ad to
-unlock another 24 hours — coming soon.</p>
-<div class="card"><a class="btn" href="/">Back home</a></div></div>
+<div class="wrap">
+  <div class="hero"><h1>⏳ Free access <span class="grad">expired</span></h1>
+  <p>Your free generation window has ended.<br>Watch a short ad to unlock another 24 hours — coming soon.</p></div>
+  <div class="card" style="text-align:center"><a class="btn ghost" href="/">← Back home</a></div>
+</div>
 """
 
 TRANSCRIPT_FORM = CSS + """
 <div class="wrap">
 """ + NAV + """
-  <p class="sub">Paste a YouTube link → get its full transcript.</p>
+  <div class="hero" style="padding-top:6px"><h1 style="font-size:30px">📝 <span class="grad">Transcript</span> viewer</h1>
+  <p class="sub">Paste a YouTube link → get its full transcript.</p></div>
   {% if err %}<div class="err">{{err}}</div>{% endif %}
   <div class="card">
     <form action="/transcript" method="post">
@@ -296,8 +428,7 @@ TRANSCRIPT_FORM = CSS + """
              placeholder="https://www.youtube.com/watch?v=...">
       <button type="submit">📝 Get transcript</button>
     </form>
-    <p class="note">Tries YouTube's own captions first (fast, no download).
-    Falls back to AI transcription when a video has no captions.</p>
+    <p class="note" style="text-align:center;margin-bottom:0">YouTube captions first (fast) → AI transcription fallback</p>
   </div>
 </div>
 """
@@ -305,26 +436,23 @@ TRANSCRIPT_FORM = CSS + """
 TRANSCRIPT_RESULT = CSS + """
 <div class="wrap">
 """ + NAV + """
-  <p class="sub">{{title}}<br>
-  <span class="note">Source: <b>{{src}}</b> · {{n}} lines</span></p>
-  <div class="card" style="display:flex;gap:8px">
-    <button id="copybtn" style="margin:0">📋 Copy</button>
-    <a class="btn" style="margin:0" href="/transcript/file/{{token}}.txt" download>⬇ .txt</a>
-    <a class="btn" style="margin:0;background:#33333f"
-       href="/transcript/file/{{token}}.srt" download>⬇ .srt</a>
-  </div>
-  <div class="card" id="tbox">
+  <h1 style="font-size:20px;line-height:1.35">{{title}}</h1>
+  <p style="margin:0 0 4px"><span class="badge">{{src}}</span>
+  <span class="note"> · {{n}} lines</span></p>
+  <div class="card"><div class="rowbtns">
+    <button id="copybtn">📋 Copy</button>
+    <a class="btn ghost" href="/transcript/file/{{token}}.txt" download>⬇ .txt</a>
+    <a class="btn ghost" href="/transcript/file/{{token}}.srt" download>⬇ .srt</a>
+  </div></div>
+  <div class="card" id="tbox" style="padding:10px 18px">
   {% for s in lines %}
-    <p style="margin:8px 0;line-height:1.5">
-      <a href="#" class="ts" data-t="{{s.t}}"
-         style="color:#7ab8ff;text-decoration:none;font-size:13px">{{s.clock}}</a>
-      &nbsp;{{s.text}}</p>
+    <p class="tline"><a href="#" class="ts" data-t="{{s.t}}">{{s.clock}}</a>{{s.text}}</p>
   {% endfor %}
   </div>
 </div>
 <script>
 document.getElementById("copybtn").onclick=async()=>{
-  const t=[...document.querySelectorAll("#tbox p")]
+  const t=[...document.querySelectorAll("#tbox .tline")]
     .map(p=>p.innerText).join("\\n");
   await navigator.clipboard.writeText(t);
   document.getElementById("copybtn").textContent="✅ Copied!";
@@ -338,18 +466,23 @@ document.querySelectorAll(".ts").forEach(a=>{a.onclick=e=>{
 """
 
 TPROGRESS = CSS + """
-<div class="wrap"><h1>Transcribing… ⏳</h1>
-<p class="sub" id="msg">This video has no YouTube captions — running AI
-transcription (a few minutes). Keep this page open.</p>
-<div class="bar"><div id="fill" style="width:30%"></div></div></div>
+<div class="wrap">
+  <div class="hero"><h1 style="font-size:30px">Transcribing… <span class="grad">⏳</span></h1>
+  <p class="sub" id="msg">No YouTube captions on this video — running AI transcription (a few minutes).</p></div>
+  <div class="card" style="text-align:center">
+    <div class="spin"></div>
+    <div class="bar"><div id="fill" style="width:35%"></div></div>
+    <p class="note">Keep this page open ☕</p>
+  </div>
+</div>
 <script>
 const jid="{{jid}}";
 async function tick(){
   const r=await fetch("/tstatus/"+jid); const s=await r.json();
-  document.getElementById("msg").textContent=
-    s.stage==="error" ? "Error: "+s.error : s.msg;
-  if(s.stage==="done") location.href="/transcript/view/"+s.token;
-  else if(s.stage!=="error") setTimeout(tick,3000);
+  if(s.stage==="error"){document.getElementById("msg").textContent="❌ "+s.error;return;}
+  document.getElementById("msg").textContent=s.msg;
+  if(s.stage==="done")location.href="/transcript/view/"+s.token;
+  else setTimeout(tick,3000);
 }
 tick();
 </script>
@@ -358,8 +491,8 @@ tick();
 INSPECT_FORM = CSS + """
 <div class="wrap">
 """ + NAV + """
-  <p class="sub">Paste a YouTube link → see its title, tags, hashtags and
-  description. Handy for competitor research.</p>
+  <div class="hero" style="padding-top:6px"><h1 style="font-size:30px">🔍 Video <span class="grad">inspector</span></h1>
+  <p class="sub">Paste a YouTube link → title, tags, hashtags & description.<br>Handy for competitor research.</p></div>
   {% if err %}<div class="err">{{err}}</div>{% endif %}
   <div class="card">
     <form action="/inspect" method="post">
@@ -367,7 +500,7 @@ INSPECT_FORM = CSS + """
              placeholder="https://www.youtube.com/watch?v=...">
       <button type="submit">🔍 Inspect video</button>
     </form>
-    <p class="note">Reads public metadata only — nothing is downloaded.</p>
+    <p class="note" style="text-align:center;margin-bottom:0">Reads public metadata only — nothing is downloaded</p>
   </div>
 </div>
 """
@@ -376,34 +509,36 @@ INSPECT_RESULT = CSS + """
 <div class="wrap">
 """ + NAV + """
   <div class="card">
-    <h1 style="font-size:20px">{{meta.title}}</h1>
-    <p class="sub">{{meta.channel}} · {{meta.duration_str}} ·
-       👁 {{meta.view_count}} · 👍 {{meta.like_count}} ·
-       📅 {{meta.upload_date}}</p>
-    <details><summary style="cursor:pointer;color:#7ab8ff">Full description
-      ({{meta.description|length}} chars)</summary>
+    <h1 style="font-size:21px;line-height:1.35;margin-top:0">{{meta.title}}</h1>
+    <p class="sub" style="margin-bottom:10px">{{meta.channel}}</p>
+    <div class="stats">
+      <div class="stat"><b>⏱</b><span>{{meta.duration_str}}</span></div>
+      <div class="stat"><b>👁</b><span>{{meta.view_count}}</span></div>
+      <div class="stat"><b>👍</b><span>{{meta.like_count}}</span></div>
+      <div class="stat"><b>📅</b><span>{{meta.upload_date}}</span></div>
+    </div>
+    <details><summary>Full description ({{meta.description|length}} chars)</summary>
       <p class="note" style="white-space:pre-wrap">{{meta.description}}</p>
     </details>
   </div>
   <div class="card">
-    <div class="top"><h1 style="font-size:18px">🏷 Tags ({{meta.tags|length}})</h1>
-      <button id="ctags" style="width:auto;padding:8px 14px;margin:0;font-size:14px">Copy all</button></div>
-    <p id="tagbox" style="line-height:2.1">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <b>🏷 Tags ({{meta.tags|length}})</b>
+      <button id="ctags" style="width:auto;padding:9px 16px;margin:0;font-size:13px">Copy all</button></div>
+    <p id="tagbox" style="line-height:2.2;margin:0">
     {% for t in meta.tags %}<span class="chip">{{t}}</span> {% else %}
       <span class="note">No tags on this video.</span>{% endfor %}</p>
   </div>
   <div class="card">
-    <div class="top"><h1 style="font-size:18px"># Hashtags ({{hashtags|length}})</h1>
-      <button id="chash" style="width:auto;padding:8px 14px;margin:0;font-size:14px">Copy all</button></div>
-    <p id="hashbox" style="line-height:2.1">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <b># Hashtags ({{hashtags|length}})</b>
+      <button id="chash" style="width:auto;padding:9px 16px;margin:0;font-size:13px">Copy all</button></div>
+    <p id="hashbox" style="line-height:2.2;margin:0">
     {% for h in hashtags %}<span class="chip">{{h}}</span> {% else %}
       <span class="note">No hashtags found.</span>{% endfor %}</p>
   </div>
-  <p class="note"><a href="{{meta.webpage_url}}">Open on YouTube ↗</a></p>
+  <p class="note" style="text-align:center"><a href="{{meta.webpage_url}}">Open on YouTube ↗</a></p>
 </div>
-<style>.chip{display:inline-block;background:#2a2a35;border:1px solid #3a3a48;
-  border-radius:20px;padding:4px 12px;font-size:14px;margin:2px;cursor:pointer}
-  .chip:active{background:#3a3a48}</style>
 <script>
 function chips(id){return [...document.querySelectorAll("#"+id+" .chip")]
   .map(c=>c.textContent);}
@@ -417,6 +552,7 @@ document.querySelectorAll(".chip").forEach(c=>{c.onclick=async()=>{
   await navigator.clipboard.writeText(c.textContent);};});
 </script>
 """
+
 
 
 # --- transcript + inspect -----------------------------------------------------
@@ -498,10 +634,12 @@ def transcript():
     if not user_can_generate(current_user):
         return render_template_string(GATE_DENIED), 403
     if request.method == "GET":
-        return render_template_string(TRANSCRIPT_FORM, user=current_user.name)
+        return render_template_string(TRANSCRIPT_FORM, user=current_user.name,
+                                   activetab="transcript")
     url = request.form.get("url", "").strip()
     if not url or "http" not in url:
         return render_template_string(TRANSCRIPT_FORM, user=current_user.name,
+                                      activetab="transcript",
                                       err="Please paste a valid YouTube URL.")
     work_dir = os.path.join(BASE_DIR, "transcript_jobs",
                             "fast_" + uuid.uuid4().hex[:8])
@@ -509,7 +647,7 @@ def transcript():
         lines, source = fetch_captions(url, work_dir)
     except RuntimeError as exc:
         return render_template_string(TRANSCRIPT_FORM, user=current_user.name,
-                                      err=str(exc))
+                                      activetab="transcript", err=str(exc))
     if lines:
         try:
             meta = fetch_metadata(url)
@@ -560,6 +698,7 @@ def transcript_view(token):
         return redirect(url_for("transcript"))
     return render_template_string(
         TRANSCRIPT_RESULT, user=current_user.name, token=token,
+        activetab="transcript",
         title=t["title"], src=t["source"], n=len(t["lines"]),
         lines=_transcript_view_lines(t["lines"]))
 
@@ -594,28 +733,40 @@ def inspect():
     if not user_can_generate(current_user):
         return render_template_string(GATE_DENIED), 403
     if request.method == "GET":
-        return render_template_string(INSPECT_FORM, user=current_user.name)
+        return render_template_string(INSPECT_FORM, user=current_user.name,
+                                activetab="inspect")
     url = request.form.get("url", "").strip()
     if not url or "http" not in url:
         return render_template_string(INSPECT_FORM, user=current_user.name,
+                                      activetab="inspect",
                                       err="Please paste a valid YouTube URL.")
     try:
         meta = fetch_metadata(url)
     except RuntimeError as exc:
         return render_template_string(INSPECT_FORM, user=current_user.name,
-                                      err=str(exc))
+                                      activetab="inspect", err=str(exc))
     hashtags = extract_hashtags(meta["title"], meta["description"])
     return render_template_string(INSPECT_RESULT, user=current_user.name,
+                                  activetab="inspect",
                                   meta=meta, hashtags=hashtags)
 
 
 # --- routes -------------------------------------------------------------------
-STYLE_OPTIONS = "".join(
-    f'<option value="{k}"'
-    f'{" selected" if k == DEFAULT_STYLE else ""}>'
-    f'{v["label"]}</option>'
-    for k, v in STYLES.items()
-) + '<option value="none">🚫 No subtitles</option>'
+# Style picker pills for the home page (radio inputs styled as cards).
+_STYLE_PILL_META = {
+    "karaoke": ("🎤", "Karaoke"),
+    "clean": ("✨", "Clean"),
+    "pop": ("💥", "Pop"),
+    "minimal": ("🌫", "Minimal"),
+    "none": ("🚫", "No subs"),
+}
+STYLE_PILLS = "".join(
+    f'<label class="pill"><input type="radio" name="style" value="{k}"'
+    f'{" checked" if k == DEFAULT_STYLE else ""}>'
+    f'<span class="pb"><span class="pi">{icon}</span>'
+    f'<span class="pt">{short}</span></span></label>'
+    for k, (icon, short) in _STYLE_PILL_META.items()
+)
 
 
 @app.route("/")
@@ -623,7 +774,8 @@ def index():
     if not current_user.is_authenticated:
         return render_template_string(LANDING)
     return render_template_string(HOME, user=current_user.name,
-                                  style_options=STYLE_OPTIONS)
+                                  style_pills=STYLE_PILLS,
+                                  activetab="shorts")
 
 
 @app.route("/signup", methods=["GET", "POST"])
